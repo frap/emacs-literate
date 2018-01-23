@@ -1,5 +1,5 @@
-#+TITLE: Emacs Literate Configuration
-#+AUTHOR: Your Name Here
+#+TITLE: Atea Emacs Literate Configuration
+#+AUTHOR: Andrés Gasson
 #+PROPERTY: header-args :tangle yes
 
 * Configuration
@@ -15,19 +15,34 @@
     - [[#visibility-settings][Visibility Settings]]
     - [[#table-of-contents][Table of Contents]]
   - [[#personal-information][Personal Information]]
-  - [[#emacs-initialization][Emacs Initialization]]
+  - [[#emacs-initialisation][Emacs Initialisation]]
     - [[#settings][Settings]]
     - [[#package-management][Package Management]]
   - [[#packages][Packages]]
-    - [[#evil][Evil]]
-    - [[#ivy][Ivy]]
-    - [[#counsel][Counsel]]
-    - [[#swiper][Swiper]]
+    - [[#display][Display]]
+    - [[#fonts][Fonts]]
+    - [[#whitespace][Whitespace]]
+    - [[#wordsmithing][Wordsmithing]]
+    - [[#global-keys][Global keys]]
+    - [[#which-key][Which-key]]
+    - [[#files][Files]]
     - [[#magit][Magit]]
     - [[#projectile][Projectile]]
+    - [[#ido][Ido]]
+    - [[#undo][Undo]]
     - [[#org][Org]]
+    - [[#macos][MacOS]]
     - [[#toc-org][Toc-org]]
-  - [[#post-initialization][Post Initialization]]
+  - [[#programming][Programming]]
+    - [[#eldoc][Eldoc]]
+    - [[#prettify-code][Prettify code]]
+    - [[#elisp][Elisp]]
+    - [[#clojure][Clojure]]
+    - [[#parens][Parens]]
+    - [[#cider][Cider]]
+    - [[#javascript][Javascript]]
+    - [[#yaml][YAML]]
+  - [[#post-initialisation][Post Initialisation]]
 
 ** About this file
 This is an Emacs literate configuration template. It contains the basic structure
@@ -64,11 +79,11 @@ works property directly on github.
 Let's set some variables with basic user information.
 
 #+BEGIN_SRC emacs-lisp
-(setq user-full-name "Your Name Here"
-      user-mail-address "user@email.com")
+(setq user-full-name "cust robot"
+      user-mail-address "atearoot@ateasystems.com")
 #+END_SRC
 
-** Emacs Initialization
+** Emacs Initialisation
 
 *** Settings
 We're going to increase the gc-cons-threshold to a very high number to decrease the load and compile time.
@@ -88,6 +103,77 @@ if you would like to see any and all byte compiler warnings.
 (setq byte-compile-warnings '(not free-vars unresolved noruntime lexical make-local))
 #+END_SRC
 
+Some default settings aka sanity defaults
+#+BEGIN_SRC emacs-lisp
+;;; Initialisation
+(setq inhibit-default-init t
+      inhibit-startup-echo-area-message t
+      inhibit-startup-screen t
+      initial-scratch-message nil)
+
+;; warn when opening files bigger than 100MB
+(setq large-file-warning-threshold 100000000)
+
+(defconst atea-savefile-dir (expand-file-name "savefile" user-emacs-directory))
+
+;; create the savefile dir if it doesn't exist
+(unless (file-exists-p atea-savefile-dir)
+  (make-directory atea-savefile-dir))
+
+;;; UI
+;; the blinking cursor is nothing, but an annoyance
+(blink-cursor-mode -1)
+
+;; disable the annoying bell ring
+(setq ring-bell-function 'ignore)
+
+;; disable startup screen
+(setq inhibit-startup-screen t)
+
+;; nice scrolling
+(setq scroll-margin 0
+      scroll-conservatively 100000
+      scroll-preserve-screen-position 1)
+
+;; mode line settings
+(line-number-mode t)
+(column-number-mode t)
+(size-indication-mode t)
+
+;; enable y/n answers
+(fset 'yes-or-no-p 'y-or-n-p)
+
+;; more useful frame title, that show either a file or a
+;; buffer name (if the buffer isn't visiting a file)
+(setq frame-title-format
+      '((:eval (if (buffer-file-name)
+                   (abbreviate-file-name (buffer-file-name))
+                 "%b"))))
+
+;; Productive default mode
+(setq initial-major-mode 'org-mode)
+
+;; When on a tab, make the cursor the tab length.
+(setq-default x-stretch-cursor t)
+
+;; Keep emacs Custom-settings in separate file.
+(setq custom-file (expand-file-name "custom.el" user-emacs-directory))
+(when (file-exists-p custom-file)
+(load custom-file))
+
+;; Write backup files to own directory
+(setq backup-directory-alist
+      `(("." . ,(expand-file-name
+                 (concat user-emacs-directory "backups")))))
+
+;; Make backups of files, even when they're in version control.
+(setq vc-make-backup-files t)
+
+;; Fix empty pasteboard error.
+(setq save-interprogram-paste-before-kill nil)
+
+
+#+END_SRC
 *** Package Management
 
 **** Package Settings
@@ -129,7 +215,7 @@ first.
     (setq load-path (append load-path (directory-files package-user-dir t "^[^.]" t))))
 #+END_SRC
 
-**** Initialize Package Management
+**** Initialise Package Management
 Next we are going to require =package.el= and add our additional package archives, 'melpa' and 'org'.
 Afterwards we need to initialize our packages and then ensure that =use-package= is installed, which
 we promptly install if it's missing. Finally we load =use-package= and tell it to always install any
@@ -163,50 +249,276 @@ previously compiled manually then all of the package initialization will still t
 
 ** Packages
 
-*** Evil
-Install, automatically load, and enable evil. It's like vim, but better!
+*** Display
+
+Use material theme
 
 #+BEGIN_SRC emacs-lisp
-(use-package evil
-  :demand t
+(use-package material-theme
+  :ensure t
   :config
-  (evil-mode 1))
-#+END_SRC
+  (load-theme 'material 'no-confirm))
 
-*** Ivy
-Generic completion frontend that's just awesome! Let's install and enable it.
+(use-package zenburn-theme
+  :ensure t
+  :disabled t
+  :init
+  (load-theme 'zenburn 'no-confirm))
+
+(use-package time
+  :config
+  (setq display-time-24hr-format t
+        display-time-default-load-average nil)
+  (display-time-mode))
+
+;; Save point position between sessions.
+(use-package saveplace
+   :ensure nil  ;; as not loading packages
+   :config
+   (setq save-place-file (expand-file-name "saveplace" atea-savefile-dir))
+   ;; activate if for all buffers
+   (setq-default save-place t))
+
+(use-package windmove
+  :config
+  ;; use shift + arrow keys to switch between visible buffers
+  (windmove-default-keybindings))
+
+;; diminish mode symbols
+(use-package diminish
+  :ensure t
+)
+;; delight minor and major modes
+(use-package delight
+  :ensure t
+)
+#+END_SRC
+highlights
 
 #+BEGIN_SRC emacs-lisp
-(use-package ivy
-  :demand t)
+;; highlight the current line
+(global-hl-line-mode +1)
+
+(use-package diff-hl
+  :ensure t
+  :config
+  (global-diff-hl-mode +1)
+  (add-hook 'dired-mode-hook 'diff-hl-dired-mode)
+  (add-hook 'magit-post-refresh-hook 'diff-hl-magit-post-refresh))
 #+END_SRC
-
-*** Counsel
-Counsel allows us to utilize ivy by replacing many built-in and common functions
-with richer versions. Let's install it!
-
+*** Fonts
 #+BEGIN_SRC emacs-lisp
-(use-package counsel-projectile)
-(use-package counsel
-  :demand t)
+(use-package dynamic-fonts
+  :disabled t
+  :ensure t
+  :config
+  (progn
+    (setq dynamic-fonts-preferred-monospace-point-size 10
+          dynamic-fonts-preferred-monospace-fonts
+          (-union '("Source Code Pro") dynamic-fonts-preferred-monospace-fonts))
+    (dynamic-fonts-setup)))
 #+END_SRC
-
-*** Swiper
-Swiper is an awesome searching utility with a quick preview. Let's install it and
-load it when =swiper= or =swiper-all= is called.
-
+*** Whitespace
 #+BEGIN_SRC emacs-lisp
-(use-package swiper
-  :commands (swiper swiper-all))
-#+END_SRC
+;; Emacs modes typically provide a standard means to change the
+;; indentation width -- eg. c-basic-offset: use that to adjust your
+;; personal indentation width, while maintaining the style (and
+;; meaning) of any files you load.
+(setq-default indent-tabs-mode nil)   ;; don't use tabs to indent
+(setq-default tab-width 4)            ;; but maintain correct appearance
 
+;; Newline at end of file
+(setq require-final-newline t)
+
+;; delete the selection with a keypress
+(delete-selection-mode t)
+
+(use-package whitespace
+  :delight " 🗒️"
+  :init
+  (dolist (hook '(prog-mode-hook text-mode-hook))
+    (add-hook hook #'whitespace-mode))
+  (add-hook 'before-save-hook #'whitespace-cleanup)
+  :config
+  (setq whitespace-line-column 80) ;; limit line length
+  (setq whitespace-style '(face tabs empty trailing lines-tail)))
+#+END_SRC
+*** Wordsmithing
+ options for dealing with text and words
+#+BEGIN_SRC emacs-lisp
+(prefer-coding-system 'utf-8)
+(set-default-coding-systems 'utf-8)
+(set-terminal-coding-system 'utf-8)
+(set-keyboard-coding-system 'utf-8)
+
+;; hippie expand is dabbrev expand on steroids
+(setq hippie-expand-try-functions-list '(try-expand-dabbrev
+                                         try-expand-dabbrev-all-buffers
+                                         try-expand-dabbrev-from-kill
+                                         try-complete-file-name-partially
+                                         try-complete-file-name
+                                         try-expand-all-abbrevs
+                                         try-expand-list
+                                         try-expand-line
+                                         try-complete-lisp-symbol-partially
+                                         try-complete-lisp-symbol))
+
+;; use hippie-expand instead of dabbrev
+(global-set-key (kbd "M-/") #'hippie-expand)
+(global-set-key (kbd "s-/") #'hippie-expand)
+
+  ;; abbrev mode setup
+(use-package abbrev
+  :ensure nil
+  :diminish abbrev-mode
+  :config
+  (if (file-exists-p abbrev-file-name)
+      (quietly-read-abbrev-file)))
+
+#+END_SRC
+**** Red Warnings
+
+    Various keywords (in comments) are now flagged in a Red Error font:
+
+    #+BEGIN_SRC emacs-lisp
+      (add-hook 'prog-common-hook
+         (lambda ()
+         (font-lock-add-keywords nil
+         '(("\\<\\(FIX\\|FIXME\\|TODO\\|BUG\\|HACK\\):" 1 font-lock-warning-face t)))))
+    #+END_SRC
+
+*** Global keys
+
+*** Which-key
+   Many command sequences may be logical, but who can remember them
+   all? While I used to use [[https://github.com/kai2nenobu/guide-key][guide-key]] to display the final function
+   name, it isn't as nice as [[https://github.com/justbur/emacs-which-key][which-key]].
+
+      #+name: global-keys
+   #+BEGIN_SRC elisp
+     (use-package which-key
+       :ensure t
+       :defer 10
+       :diminish which-key-mode
+       :config
+
+       ;; Replacements for how KEY is replaced when which-key displays
+       ;;   KEY → FUNCTION
+       ;; Eg: After "C-c", display "right → winner-redo" as "▶ → winner-redo"
+       (setq which-key-key-replacement-alist
+             '(("<\\([[:alnum:]-]+\\)>" . "\\1")
+               ("left"                  . "◀")
+               ("right"                 . "▶")
+               ("up"                    . "▲")
+               ("down"                  . "▼")
+               ("delete"                . "DEL") ; delete key
+               ("\\`DEL\\'"             . "BS") ; backspace key
+               ("next"                  . "PgDn")
+               ("prior"                 . "PgUp"))
+
+             ;; List of "special" keys for which a KEY is displayed as just
+             ;; K but with "inverted video" face... not sure I like this.
+             which-key-special-keys '("RET" "DEL" ; delete key
+                                      "ESC" "BS" ; backspace key
+                                      "SPC" "TAB")
+
+             ;; Replacements for how part or whole of FUNCTION is replaced:
+             which-key-description-replacement-alist
+             '(("Prefix Command" . "prefix")
+               ("\\`calc-"       . "") ; Hide "calc-" prefixes when listing M-x calc keys
+               ("\\`projectile-" . "𝓟/")
+               ("\\`org-babel-"  . "ob/"))
+
+             ;; Underlines commands to emphasize some functions:
+             which-key-highlighted-command-list
+             '("\\(rectangle-\\)\\|\\(-rectangle\\)"
+               "\\`org-"))
+
+       ;; Change what string to display for a given *complete* key binding
+       ;; Eg: After "C-x", display "8 → +unicode" instead of "8 → +prefix"
+       (which-key-add-key-based-replacements
+         "C-x 8"   "unicode"
+         "C-c T"   "toggles-"
+         "C-c p s" "projectile-search"
+         "C-c p 4" "projectile-other-buffer-"
+         "C-x a"   "abbrev/expand"
+         "C-x r"   "rect/reg"
+         "C-c /"   "engine-mode-map"
+         "C-c C-v" "org-babel")
+
+       (which-key-mode 1))
+    #+END_SRC
+
+*** Files
+
+Use dired Plus dired-x
+#+BEGIN_SRC emacs-lisp
+(use-package dired
+  :ensure nil
+  :defer t
+  :config
+  ;; dired - reuse current buffer by pressing 'a'
+  (put 'dired-find-alternate-file 'disabled nil)
+
+  ;; always delete and copy recursively
+  (setq dired-recursive-deletes 'always)
+  (setq dired-recursive-copies 'always)
+
+  ;; if there is a dired buffer displayed in the next window, use its
+  ;; current subdir, instead of the current subdir of this dired buffer
+  (setq dired-dwim-target t)
+
+  ;; enable some really cool extensions like C-x C-j(dired-jump)
+  (require 'dired-x))
+
+;; revert buffers automatically when underlying files are changed externally
+(global-auto-revert-mode t)
+
+#+END_SRC
+recent files
+#+BEGIN_SRC
+(use-package recentf
+  :init
+  (progn
+    (setq recentf-auto-cleanup 'never) ;; prevent issues with Tramp
+    (setq recentf-max-saved-items 100)
+    (setq recentf-max-menu-items 15))
+  :config
+  (recentf-mode t))
+;; Looks like a big mess, but it works.
+(defun recentf-ido-find-file ()
+  "Find a recent file using ido."
+  (interactive)
+  (let ((file (ido-completing-read "Choose recent file: " recentf-list nil t)))
+    (when file
+      (find-file file))))
+
+  (bind-key "C-x f" 'recentf-ido-find-file )
+
+#+END_SRC
 *** Magit
+
 The magical git client. Let's load magit only when one of the several entry pont
-functions we invoke regularly outside of magit is called.
+functions we invoke regularly outside of magitemacs em is called.
 
 #+BEGIN_SRC emacs-lisp
 (use-package magit
-  :commands (magit-status magit-blame magit-log-buffer-file magit-log-all))
+  :ensure   nil
+  :diminish magit-auto-revert-mode
+;;  :init     (defun magit-clone-url ()
+;;              (interactive)
+;;              (let ((git-repo-url (read-from-minibuffer "Enter git repo URL: ")))
+;;                (magit-git-command (concat " clone " git-repo-url)
+ ;;                                  default-directory)))
+
+;;  :bind     (("C-x gs" . magit-status)
+;;             ("C-x gc" . magit-clone-url))
+  :config  (setq magit-completing-read-function 'ivy-completing-read)
+           (defadvice magit-status (after magit-status-advice (dir) activate)
+              (when (window-parent)
+                (delete-other-windows)) )
+)
+
 #+END_SRC
 
 *** Projectile
@@ -215,9 +527,89 @@ going to install it and make sure it's loaded immediately.
 
 #+BEGIN_SRC emacs-lisp
 (use-package projectile
-  :demand t)
+  :ensure true
+;;  :demand t
+;;  :bind ("s-p" . projectile-command-map)
+  :config
+  (setq projectile-completion-system 'ivy)
+  :defer (projectile-cleanup-known-projects)
+  :delight '(:eval (concat " " (projectile-project-name))))
+
+(use-package ivy
+  :ensure t
+  :config
+  (ivy-mode 1)
+  (setq ivy-use-virtual-buffers t)
+  (setq enable-recursive-minibuffers t)
+  (global-set-key (kbd "C-c C-r") 'ivy-resume)
+  (global-set-key (kbd "<f6>") 'ivy-resume)
+  :delight )
+
+(use-package swiper
+  :ensure t
+  :config
+  (global-set-key "\C-s" 'swiper))
+
+(use-package counsel
+  :ensure t
+  :config
+  (global-set-key (kbd "M-x") 'counsel-M-x)
+  (global-set-key (kbd "C-x C-f") 'counsel-find-file)
+  (global-set-key (kbd "<f1> f") 'counsel-describe-function)
+  (global-set-key (kbd "<f1> v") 'counsel-describe-variable)
+  (global-set-key (kbd "<f1> l") 'counsel-find-library)
+  (global-set-key (kbd "<f2> i") 'counsel-info-lookup-symbol)
+  (global-set-key (kbd "<f2> u") 'counsel-unicode-char)
+  (global-set-key (kbd "C-c g") 'counsel-git)
+  (global-set-key (kbd "C-c j") 'counsel-git-grep)
+  (global-set-key (kbd "C-c k") 'counsel-ag)
+  (global-set-key (kbd "C-x l") 'counsel-locate)
+  (define-key minibuffer-local-map (kbd "C-r") 'counsel-minibuffer-history))
 #+END_SRC
 
+*** Ido
+
+#+BEGIN_SRC
+(use-package ibuffer
+  :bind ("C-x C-b" . ibuffer))
+
+(use-package ibuffer-projectile
+  :ensure t
+  :config
+  (add-hook 'ibuffer-hook #'ibuffer-projectile-set-filter-groups))
+
+(use-package ido
+  :ensure t
+  :init (ido-mode)
+  :config
+  (setq ido-enable-flex-matching t
+        ido-completion-buffer nil
+        ido-use-faces nil))
+
+(use-package flx-ido
+  :ensure t
+  :init (flx-ido-mode))
+
+(use-package ido-vertical-mode
+  :ensure t
+  :init (ido-vertical-mode))
+#+END_SRC
+*** Undo
+#+BEGIN_SRC emacs-lisp
+(use-package undo-tree
+  :diminish undo-tree-mode
+  :ensure t)
+
+;; Add parts of each file's directory to the buffer name if not unique
+(use-package uniquify
+   :ensure nil
+   :config
+   (setq uniquify-buffer-name-style 'forward)
+   (setq uniquify-separator "/")
+   (setq uniquify-after-kill-buffer-p t)
+   (setq uniquify-ignore-buffers-re "^\\*"))
+
+#+END_SRC
 *** Org
 Let's include a newer version of org-mode than the one that is built in. We're going
 to manually remove the org directories from the load path, to ensure the version we
@@ -226,6 +618,7 @@ want is prioritized instead.
 #+BEGIN_SRC emacs-lisp
 (use-package org
   :ensure org-plus-contrib
+  :delight org-mode "✎"
   :pin org
   :defer t)
 
@@ -234,6 +627,63 @@ want is prioritized instead.
 (setq load-path (remove-if (lambda (x) (string-match-p "org$" x)) load-path))
 #+END_SRC
 
+*** MacOS
+MacOS Customsiations
+#+BEGIN_SRC
+;; Are we on a mac?
+(setq is-mac (equal system-type 'darwin))
+
+(when (display-graphic-p)
+  (if is-mac
+      (menu-bar-mode 1)))
+
+;; Make Meta command and add Hyper.
+(when is-mac
+  ;; Change command to meta.
+  (setq mac-command-modifier 'meta)
+  (setq mac-option-modifier 'super)
+  (setq ns-function-modifier 'hyper)
+  (use-package exec-path-from-shell
+    :ensure t
+    :config
+    (exec-path-from-shell-initialize))
+
+  ;; Use right option for spacial characters.
+  (setq mac-right-option-modifier 'none)
+
+  ;; Remove date and battery status from modeline
+  (display-time-mode -1)
+  (display-battery-mode -1)
+
+  ;; Set paths to homebrew installed programs.
+  (progn
+    (setq-default ispell-program-name "/usr/local/bin/aspell"))
+
+  ;; Evaluate Code Blocks on Remote Machines
+  ;; http://howardism.org/Technical/Emacs/literate-devops.html#fn.2
+  (defun org-babel-temp-file (prefix &optional suffix)
+    "Create a temporary file in the `org-babel-temporary-directory'.
+Passes PREFIX and SUFFIX directly to `make-temp-file' with the
+value of `temporary-file-directory' temporarily set to the value
+of `org-babel-temporary-directory'."
+    (if (file-remote-p default-directory)
+        (let ((prefix
+               ;; We cannot use `temporary-file-directory' as local part
+               ;; on the remote host, because it might be another OS
+               ;; there.  So we assume "/tmp", which ought to exist on
+               ;; relevant architectures.
+               (concat (file-remote-p default-directory)
+                       ;; REPLACE temporary-file-directory with /tmp:
+                       (expand-file-name prefix "/tmp/"))))
+          (make-temp-file prefix nil suffix))
+      (let ((temporary-file-directory
+             (or (and (boundp 'org-babel-temporary-directory)
+                      (file-exists-p org-babel-temporary-directory)
+                      org-babel-temporary-directory)
+                 temporary-file-directory)))
+        (make-temp-file prefix nil suffix)))))
+
+#+END_SRC
 *** Toc-org
 Let's install and load the =toc-org= package after org mode is loaded. This is the
 package that automatically generates an up to date table of contents for us.
@@ -244,7 +694,248 @@ package that automatically generates an up to date table of contents for us.
   :init (add-hook 'org-mode-hook #'toc-org-enable))
 #+END_SRC
 
-** Post Initialization
+
+** Programming
+*** Eldoc
+#+BEGIN_SRC emacs-lisp
+(use-package eldoc
+  :defer     t
+  :diminish  eldoc-mode)
+#+END_SRC
+*** Prettify code
+  #+BEGIN_SRC emacs-lisp
+   ;; ----- Base set of pretty symbols.
+   (defvar base-prettify-symbols-alist '(("<=" . ?≤)
+                                      (">=" . ?≥)
+                                      ("<-" . ?←)
+                                      ("->" . ?→)
+                                      ("<=" . ?⇐)
+                                      ("=>" . ?⇒)
+                                      ("lambda" . ?λ)
+                    ))
+
+
+   (defun atea-lisp-prettify-symbols-hook ()
+    "Set pretty symbols for lisp modes."
+     (setq prettify-symbols-alist base-prettify-symbols-alist))
+
+   (defun atea-js-prettify-symbols-hook ()
+     "Set pretty symbols for JavaScript."
+     (setq prettify-symbols-alist
+        (append '(("function" . ?ƒ)) base-prettify-symbols-alist)))
+
+   (defun atea-clj-prettify-symbols-hook ()
+     "Set pretty symbols for Clojure(script)."
+     (setq prettify-symbols-alist
+        (append '(("fn" . λ)) base-prettify-symbols-alist)))
+
+   (defun other-prettify-symbols-hook ()
+     "Set pretty symbols for non-lisp programming modes."
+     (setq prettify-symbols-alist
+        (append '(("==" . ?≡)
+                           ("!=" . ?≠))
+             base-prettify-symbols-alist)))
+
+;; Hook 'em up.
+(add-hook 'emacs-lisp-mode-hook #'atea-lisp-prettify-symbols-hook)
+(add-hook 'web-mode-hook        #'other-prettify-symbols-hook)
+(add-hook 'js-mode-hook         #'atea-js-prettify-symbols-hook)
+(add-hook 'prog-mode-hook       #'other-prettify-symbols-hook)
+(add-hook 'clojure-mode-hook    #'atea-clj-prettify-symbols-hook)
+
+(global-prettify-symbols-mode 1)
+
+  #+END_SRC
+*** Elisp
+#+BEGIN_SRC emacs-lisp
+(use-package lisp-mode
+  :ensure nil
+  :config
+  (defun atea-visit-ielm ()
+    "Switch to default `ielm' buffer.
+Start `ielm' if it's not already running."
+    (interactive)
+    (crux-start-or-switch-to 'ielm "*ielm*"))
+
+  (add-hook 'emacs-lisp-mode-hook #'eldoc-mode)
+  (add-hook 'emacs-lisp-mode-hook #'rainbow-delimiters-mode)
+  (define-key emacs-lisp-mode-map (kbd "C-c C-z") #'atea-visit-ielm)
+  (define-key emacs-lisp-mode-map (kbd "C-c C-c") #'eval-defun)
+  (define-key emacs-lisp-mode-map (kbd "C-c C-b") #'eval-buffer)
+  (add-hook 'lisp-interaction-mode-hook #'eldoc-mode)
+  (add-hook 'eval-expression-minibuffer-setup-hook #'eldoc-mode))
+
+(use-package ielm
+  :config
+  (add-hook 'ielm-mode-hook #'eldoc-mode)
+  (add-hook 'ielm-mode-hook #'rainbow-delimiters-mode))
+#+END_SRC
+*** Clojure
+  lets try out aggressive-indent
+#+BEGIN_SRC emacs-lisp
+  (use-package aggressive-indent
+   :ensure t)
+#+END_SRC
+  The [[https://github.com/clojure-emacs/clojure-mode][clojure-mode]] project seems to be the best (and works well with [[*Cider][Cider]]).
+
+  #+BEGIN_SRC elisp
+   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   ;; inferior lisp
+   ;;(setq inferior-lisp-program "lein figwheel")
+
+   ;; inf-clojure test
+   ;(use-package inf-clojure
+   ;  :ensure t
+   ;  )
+
+   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+   ;; inf-clojure
+
+   ;(setq inf-clojure-program "lein figwheel")
+   ;; minor-mode adds key-bindings
+   ;(add-hook 'clojure-mode-hook 'inf-clojure-minor-mode)
+
+   (use-package clojure-mode
+      :ensure t
+      :mode ("\\.\\(clj\\|cljs\\|edn\\|boot\\)$" . clojure-mode )
+      :init   (defun rename-clojure-modeline ()
+              (interactive)
+               (setq mode-name "λclj"))
+       :config
+         (add-hook 'clojure-mode-hook #'rename-clojure-modeline)
+         (add-hook 'clojure-mode-hook #'aggressive-indent-mode)
+      ;;   (add-hook 'clojure-mode-hook #'linum-mode)
+      ;;   (add-hook 'clojure-mode-hook #'subword-mode)
+         (add-hook 'clojure-mode-hook #'paredit-mode)
+         (add-hook 'clojure-mode-hook #'rainbow-delimiters-mode)
+         (add-hook 'clojure-mode-hook #'eldoc-mode)
+       ;;  (add-hook 'clojure-mode-hook #'idle-highlight-mode)
+      ;; :bind (("C-c d f" . cider-code))
+)
+
+  #+END_SRC
+
+*** Parens
+
+
+#+BEGIN_SRC emacs-lisp
+(use-package paren
+  :ensure nil
+  :config
+  (show-paren-mode +1))
+#+END_SRC
+  Use paredit
+
+  #+BEGIN_SRC emacs-lisp
+    (use-package paredit
+    :delight " ⎎"
+    :ensure t
+    :config
+    (add-hook 'emacs-lisp-mode-hook #'paredit-mode)
+     ;; enable in the *scratch* buffer
+     (add-hook 'lisp-interaction-mode-hook #'paredit-mode)
+     (add-hook 'ielm-mode-hook #'paredit-mode)
+     (add-hook 'lisp-mode-hook #'paredit-mode)
+     (add-hook 'clojure-mode-hook #'paredit-mode)
+     (add-hook 'eval-expression-minibuffer-setup-hook #'paredit-mode))
+
+  #+END_SRC
+
+use rainbow delimiters
+#+BEGIN_SRC emacs-lisp
+(use-package rainbow-delimiters
+  :ensure t)
+
+;; Don't show anything for rainbow-mode.
+(use-package rainbow-mode
+  :delight)
+#+END_SRC
+
+#+END_SRC
+*** Cider
+da-bomb!
+#+BEGIN_SRC emacs-lisp
+   (use-package cider
+  :ensure t
+;;  :commands (cider cider-connect cider-jack-in)
+  :init
+  (setq cider-auto-select-error-buffer t
+        ;; go right to the REPL buffer when it's finished connecting
+        cider-repl-pop-to-buffer-on-connect t
+        cider-repl-use-clojure-font-lock t
+        ;; Wrap when navigating history.
+        cider-repl-wrap-history t
+        cider-repl-history-size 1000
+        ;; When there's a cider error, show its buffer and switch to it
+        cider-show-error-buffer t
+        cider-auto-select-error-buffer t
+        nrepl-hide-special-buffers t
+        ;; Stop error buffer from popping up while working in buffers other than the REPL:
+        nrepl-popup-stacktraces nil
+        ;; Where to store the cider history.
+        cider-repl-history-file "~/.emacs.d/cider-history"
+        )
+
+  :config
+ ;; (defalias 'cji 'cider-jack-in)
+  (add-hook 'cider-mode-hook #'eldoc-mode)
+  (add-hook 'cider-repl-mode-hook #'eldoc-mode)
+  (add-hook 'cider-repl-mode-hook #'paredit-mode)
+  (add-hook 'cider-repl-mode-hook #'rainbow-delimiters-mode)
+  :diminish  (cider-mode . "")
+)
+
+  (setq cider-cljs-lein-repl
+      "(cond
+   (and (resolve 'user/run) (resolve 'user/browser-repl)) ;; Chestnut projects
+   (eval '(do (user/run)
+             (user/browser-repl)))
+
+   (try
+    (require 'figwheel-sidecar.repl-api)
+    (resolve 'figwheel-sidecar.repl-api/start-figwheel!)
+    (catch Throwable _))
+   (eval '(do (figwheel-sidecar.repl-api/start-figwheel!)
+             (figwheel-sidecar.repl-api/cljs-repl)))
+
+   (try
+    (require 'cemerick.piggieback)
+    (resolve 'cemerick.piggieback/cljs-repl)
+    (catch Throwable _))
+   (eval '(cemerick.piggieback/cljs-repl (cljs.repl.rhino/repl-env)))
+
+   :else
+   (throw (ex-info \"Failed to initialise CLJS repl. Add com.cemerick/piggieback
+       and optionally figwheel-sidecar to your project.\" {})))")
+
+
+#+END_SRC
+*** Javascript
+#+BEGIN_SRC emacs-lisp
+(use-package js3-mode
+  :ensure    js3-mode
+  :init      (setq js3-indent-level          2
+                   js3-mode-dev-mode-p       t
+                   js3-auto-indent-p         t
+                   js3-enter-indents-newline t
+                   js3-indent-on-enter-key   t)
+  :mode      ("\\.\\(js\\|node\\)$" . js3-mode))
+
+(use-package json-mode
+  :ensure    json-mode
+  :config    (bind-keys :map json-mode-map
+                        ("C-c i" . json-mode-beautify))
+  :mode      ("\\.\\(json\\)$" . json-mode))
+#+END_SRC
+*** YAML
+#+BEGIN_SRC emacs-lisp
+(use-package yaml-mode
+  :mode ("\\.\\(yml\\|yaml\\|\\config\\|sls\\)$" . yaml-mode)
+  :ensure yaml-mode
+  :defer t)
+
+#+END_SRC
+** Post Initialisation
 Let's lower our GC thresholds back down to a sane level.
 
 #+BEGIN_SRC emacs-lisp
