@@ -20,12 +20,16 @@
     - [[#package-management][Package Management]]
   - [[#packages][Packages]]
     - [[#display][Display]]
+    - [[#linenumbers][LineNumbers]]
+    - [[#timestamps][Timestamps]]
     - [[#fonts][Fonts]]
     - [[#whitespace][Whitespace]]
     - [[#wordsmithing][Wordsmithing]]
+    - [[#fill-mode][Fill Mode]]
     - [[#global-keys][Global keys]]
     - [[#which-key][Which-key]]
     - [[#files][Files]]
+    - [[#git][Git]]
     - [[#magit][Magit]]
     - [[#projectile][Projectile]]
     - [[#ido][Ido]]
@@ -41,7 +45,11 @@
     - [[#parens][Parens]]
     - [[#cider][Cider]]
     - [[#javascript][Javascript]]
+- [[#js2-mode][JS2 Mode]]
     - [[#yaml][YAML]]
+    - [[#c][C]]
+    - [[#css][CSS]]
+    - [[#terraform][Terraform]]
   - [[#post-initialisation][Post Initialisation]]
 
 ** About this file
@@ -79,8 +87,8 @@ works property directly on github.
 Let's set some variables with basic user information.
 
 #+BEGIN_SRC emacs-lisp
-(setq user-full-name "cust robot"
-      user-mail-address "atearoot@ateasystems.com")
+(setq user-full-name "Andrés Gasson"
+      user-mail-address "agasson@ateasystems.com")
 #+END_SRC
 
 ** Emacs Initialisation
@@ -105,6 +113,14 @@ if you would like to see any and all byte compiler warnings.
 
 Some default settings aka sanity defaults
 #+BEGIN_SRC emacs-lisp
+;;; Code:
+;; menu shit remove
+(mapc
+ (lambda (mode)
+   (when (fboundp mode)
+     (funcall mode -1)))
+ '(menu-bar-mode tool-bar-mode scroll-bar-mode))
+
 ;;; Initialisation
 (setq inhibit-default-init t
       inhibit-startup-echo-area-message t
@@ -114,11 +130,11 @@ Some default settings aka sanity defaults
 ;; warn when opening files bigger than 100MB
 (setq large-file-warning-threshold 100000000)
 
-(defconst atea-savefile-dir (expand-file-name "savefile" user-emacs-directory))
+(defconst gas-savefile-dir (expand-file-name "savefile" user-emacs-directory))
 
 ;; create the savefile dir if it doesn't exist
-(unless (file-exists-p atea-savefile-dir)
-  (make-directory atea-savefile-dir))
+(unless (file-exists-p gas-savefile-dir)
+  (make-directory gas-savefile-dir))
 
 ;;; UI
 ;; the blinking cursor is nothing, but an annoyance
@@ -161,10 +177,14 @@ Some default settings aka sanity defaults
 (when (file-exists-p custom-file)
 (load custom-file))
 
-;; Write backup files to own directory
+;; store all backup and autosave files in the tmp dir
 (setq backup-directory-alist
-      `(("." . ,(expand-file-name
-                 (concat user-emacs-directory "backups")))))
+      `((".*" . ,temporary-file-directory)))
+(setq auto-save-file-name-transforms
+      `((".*" ,temporary-file-directory t)))
+
+;; revert buffers automatically when underlying files are changed externally
+(global-auto-revert-mode t)
 
 ;; Make backups of files, even when they're in version control.
 (setq vc-make-backup-files t)
@@ -242,7 +262,11 @@ previously compiled manually then all of the package initialization will still t
     (unless (package-installed-p 'use-package)
       (package-refresh-contents)
       (package-install 'use-package))
+    (unless (package-installed-p 'bind-key)
+      (package-refresh-contents)
+      (package-install 'bind-key))
     (require 'use-package)
+    (require 'bind-key)
     (setq use-package-always-ensure t))
 #+END_SRC
 
@@ -251,11 +275,101 @@ previously compiled manually then all of the package initialization will still t
 
 *** Display
 
-Use material theme
+#+BEGIN_SRC elisp
+  ;;(add-to-list 'custom-theme-load-path "~/.emacs.d/elpa/monokai-theme-3.4.0/")
+  (use-package monokai-theme
+  :ensure t
+ ; :disabled t
+  :config
+  (load-theme 'monokai 'no-confirm))
+;;(load-theme 'monokai t)
+
+  ;;
+  ;; Update the colour of the company-mode context menu to fit the Monokai theme
+  ;; @source: https://github.com/search?q=deftheme+company-tooltip&type=Code
+  ;;
+  (deftheme monokai-overrides)
+
+  (let ((class '((class color) (min-colors 257)))
+      (terminal-class '((class color) (min-colors 89))))
+
+  (custom-theme-set-faces
+   'monokai-overrides
+
+   ;; Linum and mode-line improvements (only in sRGB).
+   `(linum
+     ((,class :foreground "#75715E"
+              :background "#49483E")))
+   `(mode-line-inactive
+     ((,class (:box (:line-width 1 :color "#2c2d26" :style nil)
+                    :background "#2c2d26"))))
+
+   ;; Custom region colouring.
+   `(region
+     ((,class :foreground "#75715E"
+              :background "#49483E")
+      (,terminal-class :foreground "#1B1E1C"
+                       :background "#8B8878")))
+
+   ;; Additional modes
+   ;; Company tweaks.
+   `(company-tooltip-common
+     ((t :foreground "#F8F8F0"
+         :background "#474747"
+         :underline t)))
+
+   `(company-template-field
+     ((t :inherit company-tooltip
+         :foreground "#C2A1FF")))
+
+   `(company-tooltip-selection
+     ((t :background "#349B8D"
+         :foreground "#BBF7EF")))
+
+   `(company-tooltip-common-selection
+     ((t :foreground "#F8F8F0"
+         :background "#474747"
+         :underline t)))
+
+   `(company-scrollbar-fg
+     ((t :background "#BBF7EF")))
+
+   `(company-tooltip-annotation
+     ((t :inherit company-tooltip
+         :foreground "#C2A1FF")))
+
+   ;; Popup menu tweaks.
+   `(popup-menu-face
+     ((t :foreground "#A1EFE4"
+         :background "#49483E")))
+
+   `(popup-menu-selection-face
+     ((t :background "#349B8D"
+         :foreground "#BBF7EF")))
+
+   ;; Circe
+   `(circe-prompt-face
+     ((t (:foreground "#C2A1FF" :weight bold))))
+
+   `(circe-server-face
+     ((t (:foreground "#75715E"))))
+
+   `(circe-highlight-nick-face
+     ((t (:foreground "#AE81FF" :weight bold))))
+
+   `(circe-my-message-face
+     ((t (:foreground "#E6DB74"))))
+
+   `(circe-originator-face
+     ((t (:weight bold))))))
+#+END_SRC
+
+old Use material theme
 
 #+BEGIN_SRC emacs-lisp
 (use-package material-theme
   :ensure t
+  :disabled t
   :config
   (load-theme 'material 'no-confirm))
 
@@ -269,15 +383,8 @@ Use material theme
   :config
   (setq display-time-24hr-format t
         display-time-default-load-average nil)
-  (display-time-mode))
-
-;; Save point position between sessions.
-(use-package saveplace
-   :ensure nil  ;; as not loading packages
-   :config
-   (setq save-place-file (expand-file-name "saveplace" atea-savefile-dir))
-   ;; activate if for all buffers
-   (setq-default save-place t))
+;;  (display-time-mode)
+)
 
 (use-package windmove
   :config
@@ -306,7 +413,47 @@ highlights
   (add-hook 'dired-mode-hook 'diff-hl-dired-mode)
   (add-hook 'magit-post-refresh-hook 'diff-hl-magit-post-refresh))
 #+END_SRC
+*** LineNumbers
+#+BEGIN_SRC elisp
+   (setq linum-format "%4d")
+
+   (defun my-linum-mode-hook ()
+     (linum-mode t))
+
+    (add-hook 'find-file-hook 'my-linum-mode-hook)
+#+END_SRC
+*** Timestamps
+#+BEGIN_SRC elisp
+(defun format-date (format)
+  (let ((system-time-locale "en_NZ.UTF-8"))
+    (insert (format-time-string format))))
+
+(defun insert-date ()
+  (interactive)
+  (format-date "%A, %B %d %Y"))
+
+(defun insert-date-and-time ()
+  (interactive)
+  (format-date "%Y-%m-%d %H:%M:%S"))
+#+END_SRC
+
 *** Fonts
+  There is a new wonderful coding font that I discovered recently called the Input (Font for Code).
+  This is a really neat font that works particularly well. You just have to go to their site,
+  define the characteristics you want for it, download and install it locally.
+  #+BEGIN_SRC emacs-lisp
+  ;;Use the Input Sans font size 12
+  (set-frame-font "Input Sans Condensed-12")
+  #+END_SRC
+
+  And the best coloured highlighting of selected text needs to be both
+  bright, but not obscure the white text in the foreground (see
+  =list-colors-display=). Favorites so far are =purple4= and =DarkOrange3=:
+
+  #+BEGIN_SRC emacs-lisp
+    (set-face-background 'region "DarkOrange3")
+  #+END_SRC
+
 #+BEGIN_SRC emacs-lisp
 (use-package dynamic-fonts
   :disabled t
@@ -334,14 +481,23 @@ highlights
 (delete-selection-mode t)
 
 (use-package whitespace
+  :bind ("C-c T w" . whitespace-mode)
   :delight " 🗒️"
   :init
-  (dolist (hook '(prog-mode-hook text-mode-hook))
-    (add-hook hook #'whitespace-mode))
+   (setq whitespace-line-column nil
+          whitespace-display-mappings '((space-mark 32 [183] [46])
+                                           (newline-mark 10 [9166 10])
+                                           (tab-mark 9 [9654 9] [92 9])))
+  ;(dolist (hook '(prog-mode-hook text-mode-hook))
+  ;  (add-hook hook #'whitespace-mode))
   (add-hook 'before-save-hook #'whitespace-cleanup)
   :config
   (setq whitespace-line-column 80) ;; limit line length
-  (setq whitespace-style '(face tabs empty trailing lines-tail)))
+  (setq whitespace-style '(face tabs empty trailing lines-tail))
+  (set-face-attribute 'whitespace-space       nil :foreground "#666666" :background nil)
+  (set-face-attribute 'whitespace-newline     nil :foreground "#666666" :background nil)
+  (set-face-attribute 'whitespace-indentation nil :foreground "#666666" :background nil)
+)
 #+END_SRC
 *** Wordsmithing
  options for dealing with text and words
@@ -375,78 +531,64 @@ highlights
   (if (file-exists-p abbrev-file-name)
       (quietly-read-abbrev-file)))
 
+(use-package flyspell
+  :config
+    (when (eq system-type 'windows-nt)
+      (add-to-list 'exec-path "C:/Program Files (x86)/Aspell/bin/"))
+    (setq ispell-program-name "aspell" ; use aspell instead of ispell
+         ispell-extra-args '("--sug-mode=ultra"))
+    (add-hook 'text-mode-hook #'flyspell-mode)
+    (add-hook 'prog-mode-hook #'flyspell-prog-mode)
+  :delight "")
+
+(use-package flycheck
+  :ensure t
+  :config
+  (add-hook 'after-init-hook #'global-flycheck-mode)
+  :delight "")
+
 #+END_SRC
 **** Red Warnings
 
-    Various keywords (in comments) are now flagged in a Red Error font:
+ Various keywords (in comments) are now flagged in a Red Error font:
 
     #+BEGIN_SRC emacs-lisp
       (add-hook 'prog-common-hook
          (lambda ()
          (font-lock-add-keywords nil
-         '(("\\<\\(FIX\\|FIXME\\|TODO\\|BUG\\|HACK\\):" 1 font-lock-warning-face t)))))
+         '(("\\<\\(FIX\\|FIXME\\|TODO\\|BUG\\|HACK\\):"
+                1 font-lock-warning-face t)))))
     #+END_SRC
 
-*** Global keys
+*** Fill Mode
 
+   Automatically wrapping when you get to the end of a line (or the
+   fill-region):
+
+   #+BEGIN_SRC elisp
+     (use-package fill
+       :bind (("C-c T f" . auto-fill-mode)
+              ("C-c T t" . toggle-truncate-lines))
+       :init (add-hook 'org-mode-hook 'turn-on-auto-fill)
+       :diminish auto-fill-mode)
+   #+END_SRC
+
+*** Global keys
+company mode TAB
+#+BEGIN_SRC emacs-lisp
+  (global-set-key (kbd "TAB") #'company-indent-or-complete-common)
+#+END_SRC
 *** Which-key
    Many command sequences may be logical, but who can remember them
    all? While I used to use [[https://github.com/kai2nenobu/guide-key][guide-key]] to display the final function
    name, it isn't as nice as [[https://github.com/justbur/emacs-which-key][which-key]].
 
       #+name: global-keys
-   #+BEGIN_SRC elisp
-     (use-package which-key
-       :ensure t
-       :defer 10
-       :diminish which-key-mode
-       :config
-
-       ;; Replacements for how KEY is replaced when which-key displays
-       ;;   KEY → FUNCTION
-       ;; Eg: After "C-c", display "right → winner-redo" as "▶ → winner-redo"
-       (setq which-key-key-replacement-alist
-             '(("<\\([[:alnum:]-]+\\)>" . "\\1")
-               ("left"                  . "◀")
-               ("right"                 . "▶")
-               ("up"                    . "▲")
-               ("down"                  . "▼")
-               ("delete"                . "DEL") ; delete key
-               ("\\`DEL\\'"             . "BS") ; backspace key
-               ("next"                  . "PgDn")
-               ("prior"                 . "PgUp"))
-
-             ;; List of "special" keys for which a KEY is displayed as just
-             ;; K but with "inverted video" face... not sure I like this.
-             which-key-special-keys '("RET" "DEL" ; delete key
-                                      "ESC" "BS" ; backspace key
-                                      "SPC" "TAB")
-
-             ;; Replacements for how part or whole of FUNCTION is replaced:
-             which-key-description-replacement-alist
-             '(("Prefix Command" . "prefix")
-               ("\\`calc-"       . "") ; Hide "calc-" prefixes when listing M-x calc keys
-               ("\\`projectile-" . "𝓟/")
-               ("\\`org-babel-"  . "ob/"))
-
-             ;; Underlines commands to emphasize some functions:
-             which-key-highlighted-command-list
-             '("\\(rectangle-\\)\\|\\(-rectangle\\)"
-               "\\`org-"))
-
-       ;; Change what string to display for a given *complete* key binding
-       ;; Eg: After "C-x", display "8 → +unicode" instead of "8 → +prefix"
-       (which-key-add-key-based-replacements
-         "C-x 8"   "unicode"
-         "C-c T"   "toggles-"
-         "C-c p s" "projectile-search"
-         "C-c p 4" "projectile-other-buffer-"
-         "C-x a"   "abbrev/expand"
-         "C-x r"   "rect/reg"
-         "C-c /"   "engine-mode-map"
-         "C-c C-v" "org-babel")
-
-       (which-key-mode 1))
+   #+BEGIN_SRC emacs-lisp
+   (use-package which-key
+     :ensure t
+     :config
+   (which-key-mode +1))
     #+END_SRC
 
 *** Files
@@ -455,36 +597,80 @@ Use dired Plus dired-x
 #+BEGIN_SRC emacs-lisp
 (use-package dired
   :ensure nil
-  :defer t
+;  :defer t
   :config
   ;; dired - reuse current buffer by pressing 'a'
-  (put 'dired-find-alternate-file 'disabled nil)
+  (progn
+    (put 'dired-find-alternate-file 'disabled nil)
 
-  ;; always delete and copy recursively
-  (setq dired-recursive-deletes 'always)
-  (setq dired-recursive-copies 'always)
+    ;; always delete and copy recursively
+    (setq dired-recursive-deletes 'always)
+    (setq dired-recursive-copies 'always)
 
-  ;; if there is a dired buffer displayed in the next window, use its
-  ;; current subdir, instead of the current subdir of this dired buffer
-  (setq dired-dwim-target t)
+    ;; if there is a dired buffer displayed in the next window, use its
+    ;; current subdir, instead of the current subdir of this dired buffer
+    (setq dired-dwim-target t)
 
-  ;; enable some really cool extensions like C-x C-j(dired-jump)
-  (require 'dired-x))
+    ;; enable some really cool extensions like C-x C-j(dired-jump)
+    (require 'dired-x)
+   )
+  )
 
 ;; revert buffers automatically when underlying files are changed externally
 (global-auto-revert-mode t)
 
-#+END_SRC
-recent files
-#+BEGIN_SRC
-(use-package recentf
-  :init
-  (progn
-    (setq recentf-auto-cleanup 'never) ;; prevent issues with Tramp
-    (setq recentf-max-saved-items 100)
-    (setq recentf-max-menu-items 15))
+;;; Completion, snippets
+
+(use-package company
+  :diminish company-mode
+  :ensure t
+  :defer t
   :config
-  (recentf-mode t))
+  (progn
+    (global-company-mode)
+    (bind-key "M-TAB" 'company-select-next company-active-map)
+    (setq company-tooltip-align-annotations t
+          company-dabbrev-downcase nil
+          company-dabbrev-code-everywhere t
+          company-dabbrev-ignore-case nil))
+   )
+
+
+#+END_SRC
+save place and recent files
+#+BEGIN_SRC emacs-lisp
+;; Save point position between sessions.
+(use-package saveplace
+   :ensure nil  ;; as not loading packages
+   :config
+   (setq save-place-file (expand-file-name "saveplace" gas-savefile-dir))
+   ;; activate if for all buffers
+   (setq-default save-place t)
+ )
+
+(use-package savehist
+  :config
+  (setq savehist-additional-variables
+        ;; search entries
+        '(search-ring regexp-search-ring)
+        ;; save every minute
+        savehist-autosave-interval 60
+        ;; keep the home clean
+        savehist-file (expand-file-name "savehist" gas-savefile-dir))
+  (savehist-mode +1)
+ )
+
+(use-package recentf
+  :config
+  (setq recentf-save-file (expand-file-name "recentf" gas-savefile-dir)
+        recentf-max-saved-items 500
+        recentf-max-menu-items 15
+        ;; disable recentf-cleanup on Emacs start, because it can cause
+        ;; problems with remote files aka tramp
+        recentf-auto-cleanup 'never)
+  (recentf-mode +1)
+ )
+
 ;; Looks like a big mess, but it works.
 (defun recentf-ido-find-file ()
   "Find a recent file using ido."
@@ -496,30 +682,69 @@ recent files
   (bind-key "C-x f" 'recentf-ido-find-file )
 
 #+END_SRC
+*** Git
+
+   I like [[https://github.com/syohex/emacs-git-gutter-fringe][git-gutter-fringe]]:
+
+   #+BEGIN_SRC elisp
+     (use-package git-gutter-fringe
+        :ensure t
+        :diminish git-gutter-mode
+        :init (setq git-gutter-fr:side 'right-fringe)
+        :config (global-git-gutter-mode t))
+   #+END_SRC
+
+   I want to have special mode for Git's =configuration= file:
+
+   #+BEGIN_SRC elisp
+     (use-package gitconfig-mode
+       :ensure t)
+
+     (use-package gitignore-mode
+       :ensure t)
+   #+END_SRC
+
+   What about being able to see the [[https://github.com/voins/mo-git-blame][Git blame]] in a buffer?
+
+   #+BEGIN_SRC elisp
+     (use-package mo-git-blame
+        :ensure t)
+   #+END_SRC
+
+   Run =mo-git-blame-current= to see the goodies.
+
 *** Magit
 
-The magical git client. Let's load magit only when one of the several entry pont
-functions we invoke regularly outside of magitemacs em is called.
+   Git is [[http://emacswiki.org/emacs/Git][already part of Emacs]]. However, [[http://philjackson.github.com/magit/magit.html][Magit]] is sweet.
+   Don't believe me? Check out [[https://www.youtube.com/watch?v=vQO7F2Q9DwA][this video]].
 
-#+BEGIN_SRC emacs-lisp
-(use-package magit
-  :ensure   nil
-  :diminish magit-auto-revert-mode
-;;  :init     (defun magit-clone-url ()
-;;              (interactive)
-;;              (let ((git-repo-url (read-from-minibuffer "Enter git repo URL: ")))
-;;                (magit-git-command (concat " clone " git-repo-url)
- ;;                                  default-directory)))
+   #+BEGIN_SRC elisp
+     (use-package magit
+       :ensure t
+       :commands magit-status magit-blame
+       :init
+       (defadvice magit-status (around magit-fullscreen activate)
+         (window-configuration-to-register :magit-fullscreen)
+         ad-do-it
+         (delete-other-windows))
+       :config
+       (setq magit-branch-arguments nil
+             ;; use ido to look for branches
+             magit-completing-read-function 'magit-ido-completing-read
+             ;; don't put "origin-" in front of new branch names by default
+             magit-default-tracking-name-function 'magit-default-tracking-name-branch-only
+             magit-push-always-verify nil
+             ;; Get rid of the previous advice to go into fullscreen
+             magit-restore-window-configuration t)
 
-;;  :bind     (("C-x gs" . magit-status)
-;;             ("C-x gc" . magit-clone-url))
-  :config  (setq magit-completing-read-function 'ivy-completing-read)
-           (defadvice magit-status (after magit-status-advice (dir) activate)
-              (when (window-parent)
-                (delete-other-windows)) )
-)
+       :bind ("C-x g" . magit-status))
+   #+END_SRC
 
-#+END_SRC
+   I like having Magit to run in a /full screen/ mode, and add the
+   above =defadvice= idea from [[https://github.com/magnars/.emacs.d/blob/master/setup-magit.el][Sven Magnars]].
+
+   *Note:* Use the [[https://github.com/jwiegley/emacs-release/blob/master/lisp/vc/smerge-mode.el][smerge-mode]] that is now part of Emacs.
+
 
 *** Projectile
 Projectile is a quick and easy project management package that "just works". We're
@@ -527,28 +752,35 @@ going to install it and make sure it's loaded immediately.
 
 #+BEGIN_SRC emacs-lisp
 (use-package projectile
-  :ensure true
+  :ensure projectile
 ;;  :demand t
 ;;  :bind ("s-p" . projectile-command-map)
   :config
-  (setq projectile-completion-system 'ivy)
+  (progn
+    (setq projectile-enable-caching t)
+    (setq projectile-require-project-root nil)
+    (setq projectile-completion-system 'ivy)
+    (add-to-list 'projectile-globally-ignored-files ".DS_Store")
+  )
   :defer (projectile-cleanup-known-projects)
-  :delight '(:eval (concat " " (projectile-project-name))))
+  :delight '(:eval (concat "𝓟/" (projectile-project-name)))
+)
 
 (use-package ivy
   :ensure t
   :config
-  (ivy-mode 1)
-  (setq ivy-use-virtual-buffers t)
-  (setq enable-recursive-minibuffers t)
-  (global-set-key (kbd "C-c C-r") 'ivy-resume)
-  (global-set-key (kbd "<f6>") 'ivy-resume)
+    (ivy-mode 1)
+    (setq ivy-use-virtual-buffers t)
+    (setq enable-recursive-minibuffers t)
+    (global-set-key (kbd "C-c C-r") 'ivy-resume)
+    (global-set-key (kbd "<f6>") 'ivy-resume)
   :delight )
 
 (use-package swiper
   :ensure t
   :config
-  (global-set-key "\C-s" 'swiper))
+  (global-set-key "\C-s" 'swiper)
+)
 
 (use-package counsel
   :ensure t
@@ -564,12 +796,13 @@ going to install it and make sure it's loaded immediately.
   (global-set-key (kbd "C-c j") 'counsel-git-grep)
   (global-set-key (kbd "C-c k") 'counsel-ag)
   (global-set-key (kbd "C-x l") 'counsel-locate)
-  (define-key minibuffer-local-map (kbd "C-r") 'counsel-minibuffer-history))
+  (define-key minibuffer-local-map (kbd "C-r") 'counsel-minibuffer-history)
+)
 #+END_SRC
 
 *** Ido
 
-#+BEGIN_SRC
+#+BEGIN_SRC emacs-lisp
 (use-package ibuffer
   :bind ("C-x C-b" . ibuffer))
 
@@ -628,8 +861,8 @@ want is prioritized instead.
 #+END_SRC
 
 *** MacOS
-MacOS Customsiations
-#+BEGIN_SRC
+MacOS Customisations
+#+BEGIN_SRC emacs-lisp
 ;; Are we on a mac?
 (setq is-mac (equal system-type 'darwin))
 
@@ -640,48 +873,19 @@ MacOS Customsiations
 ;; Make Meta command and add Hyper.
 (when is-mac
   ;; Change command to meta.
-  (setq mac-command-modifier 'meta)
-  (setq mac-option-modifier 'super)
-  (setq ns-function-modifier 'hyper)
-  (use-package exec-path-from-shell
-    :ensure t
-    :config
-    (exec-path-from-shell-initialize))
+  (setq mac-command-modifier 'super)
+  (setq mac-option-modifier 'meta)
+  ;; not sure what hyper is (setq ns-function-modifier 'hyper)
 
-  ;; Use right option for spacial characters.
-  (setq mac-right-option-modifier 'none)
+  ;; Use right option for special characters.
+;;  (setq mac-right-option-modifier 'none)
 
   ;; Remove date and battery status from modeline
   (display-time-mode -1)
   (display-battery-mode -1)
 
-  ;; Set paths to homebrew installed programs.
-  (progn
-    (setq-default ispell-program-name "/usr/local/bin/aspell"))
 
-  ;; Evaluate Code Blocks on Remote Machines
-  ;; http://howardism.org/Technical/Emacs/literate-devops.html#fn.2
-  (defun org-babel-temp-file (prefix &optional suffix)
-    "Create a temporary file in the `org-babel-temporary-directory'.
-Passes PREFIX and SUFFIX directly to `make-temp-file' with the
-value of `temporary-file-directory' temporarily set to the value
-of `org-babel-temporary-directory'."
-    (if (file-remote-p default-directory)
-        (let ((prefix
-               ;; We cannot use `temporary-file-directory' as local part
-               ;; on the remote host, because it might be another OS
-               ;; there.  So we assume "/tmp", which ought to exist on
-               ;; relevant architectures.
-               (concat (file-remote-p default-directory)
-                       ;; REPLACE temporary-file-directory with /tmp:
-                       (expand-file-name prefix "/tmp/"))))
-          (make-temp-file prefix nil suffix))
-      (let ((temporary-file-directory
-             (or (and (boundp 'org-babel-temporary-directory)
-                      (file-exists-p org-babel-temporary-directory)
-                      org-babel-temporary-directory)
-                 temporary-file-directory)))
-        (make-temp-file prefix nil suffix)))))
+  )
 
 #+END_SRC
 *** Toc-org
@@ -711,20 +915,19 @@ package that automatically generates an up to date table of contents for us.
                                       ("->" . ?→)
                                       ("<=" . ?⇐)
                                       ("=>" . ?⇒)
-                                      ("lambda" . ?λ)
-                    ))
+                                      ("lambda" . ?λ ))
+   )
 
-
-   (defun atea-lisp-prettify-symbols-hook ()
+   (defun gas-lisp-prettify-symbols-hook ()
     "Set pretty symbols for lisp modes."
      (setq prettify-symbols-alist base-prettify-symbols-alist))
 
-   (defun atea-js-prettify-symbols-hook ()
+   (defun gas-js-prettify-symbols-hook ()
      "Set pretty symbols for JavaScript."
      (setq prettify-symbols-alist
         (append '(("function" . ?ƒ)) base-prettify-symbols-alist)))
 
-   (defun atea-clj-prettify-symbols-hook ()
+   (defun gas-clj-prettify-symbols-hook ()
      "Set pretty symbols for Clojure(script)."
      (setq prettify-symbols-alist
         (append '(("fn" . λ)) base-prettify-symbols-alist)))
@@ -737,11 +940,11 @@ package that automatically generates an up to date table of contents for us.
              base-prettify-symbols-alist)))
 
 ;; Hook 'em up.
-(add-hook 'emacs-lisp-mode-hook #'atea-lisp-prettify-symbols-hook)
+(add-hook 'emacs-lisp-mode-hook #'gas-lisp-prettify-symbols-hook)
 (add-hook 'web-mode-hook        #'other-prettify-symbols-hook)
-(add-hook 'js-mode-hook         #'atea-js-prettify-symbols-hook)
+(add-hook 'js-mode-hook         #'gas-js-prettify-symbols-hook)
 (add-hook 'prog-mode-hook       #'other-prettify-symbols-hook)
-(add-hook 'clojure-mode-hook    #'atea-clj-prettify-symbols-hook)
+(add-hook 'clojure-mode-hook    #'gas-clj-prettify-symbols-hook)
 
 (global-prettify-symbols-mode 1)
 
@@ -750,16 +953,17 @@ package that automatically generates an up to date table of contents for us.
 #+BEGIN_SRC emacs-lisp
 (use-package lisp-mode
   :ensure nil
+;;  :delight "lisp"
   :config
-  (defun atea-visit-ielm ()
-    "Switch to default `ielm' buffer.
-Start `ielm' if it's not already running."
-    (interactive)
-    (crux-start-or-switch-to 'ielm "*ielm*"))
+;;  (defun gas-visit-ielm ()
+;;    "Switch to default `ielm' buffer.
+;;Start `ielm' if it's not already running."
+;;    (interactive)
+;;    (crux-start-or-switch-to 'ielm "*ielm*"))
 
   (add-hook 'emacs-lisp-mode-hook #'eldoc-mode)
   (add-hook 'emacs-lisp-mode-hook #'rainbow-delimiters-mode)
-  (define-key emacs-lisp-mode-map (kbd "C-c C-z") #'atea-visit-ielm)
+;;  (define-key emacs-lisp-mode-map (kbd "C-c C-z") #'gas-visit-ielm)
   (define-key emacs-lisp-mode-map (kbd "C-c C-c") #'eval-defun)
   (define-key emacs-lisp-mode-map (kbd "C-c C-b") #'eval-buffer)
   (add-hook 'lisp-interaction-mode-hook #'eldoc-mode)
@@ -778,39 +982,39 @@ Start `ielm' if it's not already running."
 #+END_SRC
   The [[https://github.com/clojure-emacs/clojure-mode][clojure-mode]] project seems to be the best (and works well with [[*Cider][Cider]]).
 
-  #+BEGIN_SRC elisp
+  #+BEGIN_SRC emacs-lisp
    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
    ;; inferior lisp
-   ;;(setq inferior-lisp-program "lein figwheel")
+   (setq inferior-lisp-program "lein figwheel")
 
    ;; inf-clojure test
-   ;(use-package inf-clojure
-   ;  :ensure t
-   ;  )
+   (use-package inf-clojure
+     :ensure t
+     )
 
    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
    ;; inf-clojure
 
-   ;(setq inf-clojure-program "lein figwheel")
+   (setq inf-clojure-lein-cmd "lein figwheel")
    ;; minor-mode adds key-bindings
    ;(add-hook 'clojure-mode-hook 'inf-clojure-minor-mode)
 
    (use-package clojure-mode
       :ensure t
       :mode ("\\.\\(clj\\|cljs\\|edn\\|boot\\)$" . clojure-mode )
-      :init   (defun rename-clojure-modeline ()
-              (interactive)
-               (setq mode-name "λclj"))
-       :config
-         (add-hook 'clojure-mode-hook #'rename-clojure-modeline)
-         (add-hook 'clojure-mode-hook #'aggressive-indent-mode)
-      ;;   (add-hook 'clojure-mode-hook #'linum-mode)
-      ;;   (add-hook 'clojure-mode-hook #'subword-mode)
-         (add-hook 'clojure-mode-hook #'paredit-mode)
+      :config
+       (progn
+         (setq clojure-align-forms-automatically t)
+         (add-hook 'clojure-mode-hook #'company-mode)
+         (add-hook 'clojure-mode-hook #'linum-mode)
+         (add-hook 'clojure-mode-hook #'subword-mode)
+         ;;(add-hook 'clojure-mode-hook #'paredit-mode)
+         (add-hook 'clojure-mode-hook #'smartparens-strict-mode)
          (add-hook 'clojure-mode-hook #'rainbow-delimiters-mode)
-         (add-hook 'clojure-mode-hook #'eldoc-mode)
+         (add-hook 'clojure-mode-hook #'eldoc-mode))
        ;;  (add-hook 'clojure-mode-hook #'idle-highlight-mode)
       ;; :bind (("C-c d f" . cider-code))
+       :delight "clj"
 )
 
   #+END_SRC
@@ -828,6 +1032,7 @@ Start `ielm' if it's not already running."
 
   #+BEGIN_SRC emacs-lisp
     (use-package paredit
+     :disabled t
     :delight " ⎎"
     :ensure t
     :config
@@ -840,6 +1045,40 @@ Start `ielm' if it's not already running."
      (add-hook 'eval-expression-minibuffer-setup-hook #'paredit-mode))
 
   #+END_SRC
+
+Use smartparens
+#+BEGIN_SRC
+  (use-package smartparens
+  :ensure    smartparens
+  :init      (progn
+               (require 'smartparens)
+               (load-library "smartparens-config"))
+
+  :config   (progn
+              (smartparens-global-mode t)
+              (sp-local-pair 'emacs-lisp-mode "`" nil :when '(sp-in-string-p))
+              (sp-with-modes '(html-mode sgml-mode nxml-mode web-mode)
+                (sp-local-pair "<" ">"))
+  :bind
+  (("C-M-k" . sp-kill-sexp-with-a-twist-of-lime)
+   ("C-M-f" . sp-forward-sexp)
+   ("C-M-b" . sp-backward-sexp)
+   ("C-M-n" . sp-up-sexp)
+   ("C-M-d" . sp-down-sexp)
+   ("C-M-u" . sp-backward-up-sexp)
+   ("C-M-p" . sp-backward-down-sexp)
+   ("C-M-w" . sp-copy-sexp)
+   ("M-s" . sp-splice-sexp)
+   ("M-r" . sp-splice-sexp-killing-around)
+   ("C-)" . sp-forward-slurp-sexp)
+   ("C-}" . sp-forward-barf-sexp)
+   ("C-(" . sp-backward-slurp-sexp)
+   ("C-{" . sp-backward-barf-sexp)
+   ("M-S" . sp-split-sexp)
+   ("M-J" . sp-join-sexp)
+   ("C-M-t" . sp-transpose-sexp))
+  :delight " ⎎")
+#+END_SRC
 
 use rainbow delimiters
 #+BEGIN_SRC emacs-lisp
@@ -861,7 +1100,7 @@ da-bomb!
   :init
   (setq cider-auto-select-error-buffer t
         ;; go right to the REPL buffer when it's finished connecting
-        cider-repl-pop-to-buffer-on-connect t
+        cider-repl-pop-to-buffer-on-connect 'display-only
         cider-repl-use-clojure-font-lock t
         ;; Wrap when navigating history.
         cider-repl-wrap-history t
@@ -877,12 +1116,18 @@ da-bomb!
         )
 
   :config
- ;; (defalias 'cji 'cider-jack-in)
-  (add-hook 'cider-mode-hook #'eldoc-mode)
-  (add-hook 'cider-repl-mode-hook #'eldoc-mode)
-  (add-hook 'cider-repl-mode-hook #'paredit-mode)
-  (add-hook 'cider-repl-mode-hook #'rainbow-delimiters-mode)
-  :diminish  (cider-mode . "")
+  (progn ;; (defalias 'cji 'cider-jack-in)
+    (add-hook 'cider-mode-hook #'eldoc-mode)
+    (add-hook 'cider-repl-mode-hook #'eldoc-mode)
+  ;;  (add-hook 'cider-repl-mode-hook #'smartparens-strict-mode)
+    (add-hook 'cider-repl-mode-hook #'company-mode)
+    (add-hook 'cider-mode-hook #'company-mode)
+    (add-hook 'cider-repl-mode-hook #'cider-company-enable-fuzzy-completion)
+    (add-hook 'cider-mode-hook #'cider-company-enable-fuzzy-completion)
+    ;; (add-hook 'cider-repl-mode-hook #'paredit-mode)
+    (add-hook 'cider-repl-mode-hook #'rainbow-delimiters-mode)
+    )
+  :diminish  (cider-mode . "☤")
 )
 
   (setq cider-cljs-lein-repl
@@ -911,21 +1156,117 @@ da-bomb!
 
 #+END_SRC
 *** Javascript
-#+BEGIN_SRC emacs-lisp
-(use-package js3-mode
-  :ensure    js3-mode
-  :init      (setq js3-indent-level          2
-                   js3-mode-dev-mode-p       t
-                   js3-auto-indent-p         t
-                   js3-enter-indents-newline t
-                   js3-indent-on-enter-key   t)
-  :mode      ("\\.\\(js\\|node\\)$" . js3-mode))
+   JavaScript should have three parts:
+   - Syntax highlight (already included)
+   - Syntax verification (with flycheck)
+   - Interactive REPL ... using Skewer
 
+* JS2 Mode
+
+  I like the extras found in [[http://www.emacswiki.org/emacs-test/SteveYegge][Steve Yegge]]'s [[https://github.com/mooz/js2-mode][js2-mode]].
+
+  #+BEGIN_SRC elisp
+    (use-package js2-mode
+      :ensure t
+      :interpreter ("node" . js2-mode)
+      :init
+      (setq js-basic-indent 2)
+      (setq-default js2-basic-indent 2
+                    js2-basic-offset 2
+                    js2-auto-indent-p t
+                    js2-cleanup-whitespace t
+                    js2-enter-indents-newline t
+                    js2-indent-on-enter-key t
+                    js2-global-externs (list "window" "module" "require" "buster" "sinon" "assert" "refute" "setTimeout" "clearTimeout" "setInterval" "clearInterval" "location" "__dirname" "console" "JSON" "jQuery" "$"))
+
+      (add-hook 'js2-mode-hook
+                (lambda ()
+                  (push '("function" . ?ƒ) prettify-symbols-alist)))
+
+      (add-to-list 'auto-mode-alist '("\\.js$" . js2-mode)))
+  #+END_SRC
+
+  Colour /defined/ variables with [[https://github.com/ankurdave/color-identifiers-mode][color-identifiers-mode]]:
+
+  #+BEGIN_SRC elisp
+   (use-package color-identifiers-mode
+       :ensure t
+       :init
+         (add-hook 'js2-mode-hook 'color-identifiers-mode))
+  #+END_SRC
+
+**** Flycheck and JSHint
+
+  While editing JavaScript is baked into Emacs, it is quite important
+  to have [[http://flycheck.readthedocs.org/][flycheck]] validate the source based on [[http://www.jshint.com/][jshint]], and [[https://github.com/eslint/eslint][eslint]].
+  Let’s prefer =eslint=:
+
+  #+BEGIN_SRC elisp
+    (add-hook 'js2-mode-hook
+              (lambda () (flycheck-select-checker "javascript-eslint")))
+  #+END_SRC
+
+  Now load and edit a JavaScript file, like [[file:~/jshint-code-test.js][jshint-code-test.js]].
+
+**** Refactoring JavaScript
+
+  The [[https://github.com/magnars/js2-refactor.el][js2-refactor]] mode should start with =C-c .= and then a two-letter
+  mnemonic shortcut.
+
+  * =ef= is =extract-function=: Extracts the marked expressions out into a new named function.
+  * =em= is =extract-method=: Extracts the marked expressions out into a new named method in an object literal.
+  * =ip= is =introduce-parameter=: Changes the marked expression to a parameter in a local function.
+  * =lp= is =localize-parameter=: Changes a parameter to a local var in a local function.
+  * =eo= is =expand-object=: Converts a one line object literal to multiline.
+  * =co= is =contract-object=: Converts a multiline object literal to one line.
+  * =eu= is =expand-function=: Converts a one line function to multiline (expecting semicolons as statement delimiters).
+  * =cu= is =contract-function=: Converts a multiline function to one line (expecting semicolons as statement delimiters).
+  * =ea= is =expand-array=: Converts a one line array to multiline.
+  * =ca= is =contract-array=: Converts a multiline array to one line.
+  * =wi= is =wrap-buffer-in-iife=: Wraps the entire buffer in an immediately invoked function expression
+  * =ig= is =inject-global-in-iife=: Creates a shortcut for a marked global by injecting it in the wrapping immediately invoked function expression
+  * =ag= is =add-to-globals-annotation=: Creates a =/*global */= annotation if it is missing, and adds the var at point to it.
+  * =ev= is =extract-var=: Takes a marked expression and replaces it with a var.
+  * =iv= is =inline-var=: Replaces all instances of a variable with its initial value.
+  * =rv= is =rename-var=: Renames the variable on point and all occurrences in its lexical scope.
+  * =vt= is =var-to-this=: Changes local =var a= to be =this.a= instead.
+  * =ao= is =arguments-to-object=: Replaces arguments to a function call with an object literal of named arguments. Requires yasnippets.
+  * =3i= is =ternary-to-if=: Converts ternary operator to if-statement.
+  * =sv= is =split-var-declaration=: Splits a =var= with multiple vars declared, into several =var= statements.
+  * =uw= is =unwrap=: Replaces the parent statement with the selected region.
+
+#+BEGIN_SRC elisp
+  (use-package js2-refactor
+    :ensure t
+    :init   (add-hook 'js2-mode-hook 'js2-refactor-mode)
+    :config (js2r-add-keybindings-with-prefix "C-c ."))
+#+END_SRC
+
+**** Skewer
+
+  I also configure Skewer for my [[file:emacs-web.org][HTML and CSS]] files, we need to do the
+  same for JavaScript:
+
+  #+BEGIN_SRC elisp
+  (use-package skewer-mode
+     :ensure t
+     :init (add-hook 'js2-mode-hook 'skewer-mode))
+  #+END_SRC
+
+  Kick things off with =run-skewer=, and then:
+
+ * C-x C-e :: `skewer-eval-last-expression'
+ * C-M-x   :: `skewer-eval-defun'
+ * C-c C-k :: `skewer-load-buffer'
+
+**** JSON mode
+#+BEGIN_SRC emacs-lisp
 (use-package json-mode
   :ensure    json-mode
   :config    (bind-keys :map json-mode-map
                         ("C-c i" . json-mode-beautify))
   :mode      ("\\.\\(json\\)$" . json-mode))
+
 #+END_SRC
 *** YAML
 #+BEGIN_SRC emacs-lisp
@@ -935,6 +1276,38 @@ da-bomb!
   :defer t)
 
 #+END_SRC
+*** C
+#+BEGIN_SRC emacs-lisp
+ (use-package cc-mode
+  :config
+  (progn
+    (add-hook 'c-mode-hook (lambda () (c-set-style "bsd")))
+    (add-hook 'java-mode-hook (lambda () (c-set-style "bsd")))
+    (setq tab-width 2)
+    (setq c-basic-offset 2)))
+#+END_SRC
+*** CSS
+#+BEGIN_SRC emacs-lisp
+(use-package css-mode
+  :config (setq css-indent-offset 2)
+)
+#+END_SRC
+*** Terraform
+pretty terraform highlighting
+#+BEGIN_SRC emacs-lisp
+;;(use-package terraform-mode
+;;    :defer t
+;;    :init
+;;     (progn
+;;       (require 'company-terraform)
+;;       (company-terraform-init)
+;;      )
+;;    :config (setq terraform-indent-level 2)
+;;    )
+#+END_SRC
+
+#+RESULTS:
+
 ** Post Initialisation
 Let's lower our GC thresholds back down to a sane level.
 
